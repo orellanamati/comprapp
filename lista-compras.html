@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lista de compras del hogar</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff; --bg-secondary: #f7f7f5; --bg-tertiary: #f0efeb;
+    --text: #1a1a18; --text-secondary: #6b6b67; --text-tertiary: #9e9e9a;
+    --border: rgba(0,0,0,0.10); --border-med: rgba(0,0,0,0.18); --border-strong: rgba(0,0,0,0.28);
+    --green-bg: #eaf3de; --green-text: #27500a; --green-border: #97c459; --green-strong: #3b6d11;
+    --red-bg: #fcebeb; --red-text: #791f1f;
+    --accent: #1a1a18; --radius: 10px; --radius-lg: 14px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --bg-secondary: #252523; --bg-tertiary: #2e2e2c;
+      --text: #f0efeb; --text-secondary: #9e9e9a; --text-tertiary: #6b6b67;
+      --border: rgba(255,255,255,0.10); --border-med: rgba(255,255,255,0.18); --border-strong: rgba(255,255,255,0.28);
+      --green-bg: #173404; --green-text: #c0dd97; --green-border: #3b6d11; --green-strong: #97c459;
+      --red-bg: #501313; --red-text: #f7c1c1; --accent: #f0efeb;
+    }
+  }
+
+  html { background: var(--bg-tertiary); }
+  body { font-family: var(--font); background: var(--bg-tertiary); color: var(--text); min-height: 100vh; }
+
+  .app-header { background: var(--bg); border-bottom: 0.5px solid var(--border); padding: 0 24px; position: sticky; top: 0; z-index: 100; }
+  .app-header-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 16px; height: 60px; }
+  .app-title { font-size: 16px; font-weight: 500; color: var(--text); flex: 1; }
+
+  .sync-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); background: var(--bg-secondary); border: 0.5px solid var(--border); border-radius: 99px; padding: 4px 12px; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-tertiary); flex-shrink: 0; transition: background 0.3s; }
+  .sync-dot.ok { background: var(--green-strong); }
+  .sync-dot.err { background: #e24b4a; }
+  .sync-dot.connecting { background: #ef9f27; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  .progress-wrap { display: flex; align-items: center; gap: 10px; }
+  .progress-bar-bg { width: 100px; height: 5px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: var(--green-strong); border-radius: 99px; transition: width 0.3s ease; width: 0%; }
+  .progress-text { font-size: 12px; color: var(--text-secondary); min-width: 36px; text-align: right; }
+
+  .btn { height: 36px; padding: 0 14px; border-radius: var(--radius); border: 0.5px solid var(--border-med); background: var(--bg); color: var(--text); font-size: 13px; font-family: var(--font); cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .btn:hover { background: var(--bg-secondary); }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .btn-primary:hover { opacity: 0.85; background: var(--accent); }
+
+  .main { max-width: 960px; margin: 0 auto; padding: 24px 24px 48px; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+  .stat-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; text-align: center; }
+  .stat-num { font-size: 26px; font-weight: 500; color: var(--text); line-height: 1; }
+  .stat-num.green { color: var(--green-strong); }
+  .stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .toolbar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .search-wrap { flex: 1; min-width: 180px; position: relative; }
+  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-tertiary); pointer-events: none; }
+  input[type="text"] { width: 100%; height: 38px; padding: 0 12px 0 34px; border: 0.5px solid var(--border-med); border-radius: var(--radius); background: var(--bg); color: var(--text); font-size: 14px; font-family: var(--font); outline: none; transition: border-color 0.15s; }
+  input[type="text"]:focus { border-color: var(--border-strong); }
+  .filter-group { display: flex; gap: 4px; background: var(--bg-secondary); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 3px; }
+  .filter-btn { font-size: 12px; font-weight: 400; padding: 5px 11px; border-radius: 7px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; font-family: var(--font); white-space: nowrap; }
+  .filter-btn:hover { color: var(--text); }
+  .filter-btn.active { background: var(--bg); color: var(--text); border: 0.5px solid var(--border-med); font-weight: 500; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: start; }
+  @media (max-width: 760px) { .two-col { grid-template-columns: 1fr; } .progress-wrap, .sync-badge { display: none; } .main { padding: 16px 16px 40px; } }
+
+  .categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+
+  .cat-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .cat-card.all-done { border-color: var(--green-border); }
+  .cat-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 0.5px solid var(--border); cursor: pointer; user-select: none; }
+  .cat-header:hover { background: var(--bg-secondary); }
+  .cat-icon-wrap { width: 32px; height: 32px; border-radius: 8px; background: var(--bg-secondary); border: 0.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .cat-title-group { flex: 1; min-width: 0; }
+  .cat-title { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cat-progress { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+  .cat-badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--bg-secondary); color: var(--text-secondary); border: 0.5px solid var(--border); white-space: nowrap; }
+  .cat-badge.done { background: var(--green-bg); color: var(--green-text); border-color: transparent; }
+  .chevron { width: 14px; height: 14px; color: var(--text-tertiary); transition: transform 0.2s; flex-shrink: 0; }
+  .cat-card.collapsed .chevron { transform: rotate(-90deg); }
+  .cat-body { padding: 4px 0; }
+  .cat-card.collapsed .cat-body { display: none; }
+
+  .item-row { display: flex; align-items: center; gap: 10px; padding: 7px 14px; transition: background 0.1s; }
+  .item-row:hover { background: var(--bg-secondary); }
+  .check-box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border-med); background: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+  .check-box:hover { border-color: var(--green-strong); }
+  .check-box.checked { background: var(--green-strong); border-color: var(--green-strong); }
+  .check-svg { display: none; }
+  .check-box.checked .check-svg { display: block; }
+  .item-name { font-size: 13px; color: var(--text); flex: 1; }
+  .item-row.done .item-name { color: var(--text-tertiary); text-decoration: line-through; }
+  .item-delete { width: 22px; height: 22px; border-radius: 5px; border: none; background: transparent; color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: all 0.15s; font-size: 13px; font-family: var(--font); }
+  .item-row:hover .item-delete { opacity: 1; }
+  .item-delete:hover { background: var(--red-bg); color: var(--red-text); }
+
+  .add-item-row { display: flex; align-items: center; gap: 8px; padding: 8px 14px 12px; border-top: 0.5px solid var(--border); margin-top: 4px; }
+  .add-item-input { flex: 1; height: 32px; padding: 0 10px; border: 0.5px solid var(--border-med); border-radius: 7px; background: var(--bg-secondary); color: var(--text); font-size: 13px; font-family: var(--font); outline: none; }
+  .add-item-input:focus { border-color: var(--border-strong); background: var(--bg); }
+  .add-item-input::placeholder { color: var(--text-tertiary); }
+  .add-item-btn { width: 32px; height: 32px; border-radius: 7px; border: 0.5px solid var(--border-med); background: var(--bg); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; transition: all 0.15s; }
+  .add-item-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+  .add-cat-section { margin-top: 16px; background: var(--bg); border: 0.5px dashed var(--border-med); border-radius: var(--radius-lg); padding: 16px; }
+  .section-label { font-size: 11px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+  .add-cat-form { display: flex; gap: 8px; flex-wrap: wrap; }
+  .add-cat-form input[type="text"] { flex: 1; min-width: 140px; padding-left: 12px; }
+  .emoji-select { width: 72px; height: 38px; border: 0.5px solid var(--border-med); border-radius: var(--radius); background: var(--bg); color: var(--text); font-size: 14px; font-family: var(--font); padding: 0 8px; cursor: pointer; outline: none; }
+
+  .history-panel { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; position: sticky; top: 80px; }
+  .history-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
+  .history-title { font-size: 13px; font-weight: 500; color: var(--text); }
+  .history-clear { font-size: 11px; color: var(--text-tertiary); background: none; border: none; cursor: pointer; font-family: var(--font); padding: 2px 4px; border-radius: 4px; transition: color 0.15s; }
+  .history-clear:hover { color: var(--red-text); }
+  .history-list { max-height: 500px; overflow-y: auto; }
+  .history-empty { padding: 32px 16px; text-align: center; font-size: 13px; color: var(--text-tertiary); }
+  .history-item { display: flex; gap: 10px; padding: 10px 16px; border-bottom: 0.5px solid var(--border); }
+  .history-item:last-child { border-bottom: none; }
+  .history-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .dot-check { background: #3b6d11; } .dot-uncheck { background: #9e9e9a; }
+  .dot-add_item { background: #378add; } .dot-del_item { background: #e24b4a; }
+  .dot-add_cat { background: #7f77dd; } .dot-del_cat { background: #d85a30; }
+  .history-content { flex: 1; min-width: 0; }
+  .history-msg { font-size: 12px; color: var(--text); line-height: 1.45; }
+  .history-msg strong { font-weight: 500; }
+  .history-time { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; padding: 24px; }
+  .overlay.show { display: flex; }
+  .modal { background: var(--bg); border-radius: var(--radius-lg); border: 0.5px solid var(--border); padding: 24px; width: 100%; max-width: 360px; }
+  .modal h3 { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+  .modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.55; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--text); color: var(--bg); padding: 10px 20px; border-radius: var(--radius); font-size: 13px; transition: transform 0.25s ease; z-index: 999; white-space: nowrap; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .loading-screen { position: fixed; inset: 0; background: var(--bg-tertiary); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 300; }
+  .loading-spinner { width: 28px; height: 28px; border: 2px solid var(--border-med); border-top-color: var(--text); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loading-screen">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Conectando con Firebase...</div>
+</div>
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="app-title">Lista de compras del hogar</div>
+    <div class="sync-badge">
+      <div class="sync-dot connecting" id="sync-dot"></div>
+      <span id="sync-label">Conectando...</span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill"></div></div>
+      <div class="progress-text" id="progress-text">0/0</div>
+    </div>
+    <button class="btn" onclick="confirmReset()">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 1 0 1.5-4M2 4v4h4"/></svg>
+      Limpiar checks
+    </button>
+  </div>
+</header>
+
+<main class="main">
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Total</div></div>
+    <div class="stat-card"><div class="stat-num green" id="stat-checked">0</div><div class="stat-label">En stock</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-missing">0</div><div class="stat-label">Por comprar</div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+      <input type="text" id="search" placeholder="Buscar producto..." oninput="render()">
+    </div>
+    <div class="filter-group">
+      <button class="filter-btn active" onclick="setFilter('all',this)">Todos</button>
+      <button class="filter-btn" onclick="setFilter('missing',this)">Por comprar</button>
+      <button class="filter-btn" onclick="setFilter('checked',this)">En stock</button>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="categories-grid" id="grid"></div>
+      <div class="add-cat-section">
+        <div class="section-label">Nueva categoría</div>
+        <div class="add-cat-form">
+          <select class="emoji-select" id="new-cat-icon">
+            <option>🥩</option><option>🥦</option><option>🍎</option><option>🥐</option>
+            <option>🧃</option><option>🍷</option><option>🧊</option><option>🧴</option>
+            <option>🧹</option><option>🐾</option><option>💊</option><option>🎁</option>
+            <option>🛒</option><option>🍜</option><option>🥗</option><option>🫙</option>
+            <option>🧆</option><option>🥜</option><option>🫐</option><option>🧇</option>
+          </select>
+          <input type="text" id="new-cat-name" placeholder="Nombre de la categoría..." style="padding-left:12px;" onkeydown="if(event.key==='Enter') addCategory()">
+          <button class="btn btn-primary" onclick="addCategory()">Agregar</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="history-panel">
+        <div class="history-header">
+          <span class="history-title">Historial de cambios</span>
+          <button class="history-clear" onclick="clearHistory()">Limpiar</button>
+        </div>
+        <div class="history-list" id="history-list">
+          <div class="history-empty">Aún no hay cambios.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="overlay" id="confirm-overlay">
+  <div class="modal">
+    <h3 id="confirm-title">¿Confirmar?</h3>
+    <p id="confirm-msg"></p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn btn-primary" id="confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set, get, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDe_Zov78MZJFer5wPpgloJ-3JckUDVTw0",
+  authDomain: "la-lista-de-compras.firebaseapp.com",
+  databaseURL: "https://la-lista-de-compras-default-rtdb.firebaseio.com",
+  projectId: "la-lista-de-compras",
+  storageBucket: "la-lista-de-compras.firebasestorage.app",
+  messagingSenderId: "318203885260",
+  appId: "1:318203885260:web:bcb5f6a14256f6488b7469"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const DEFAULT_CATEGORIES = [
+  { id: 'lacteos', icon: '🧀', title: 'Lácteos y refrigerados', items: ['Queso crema','Queso','Mantequilla','Yogurts','Leche'] },
+  { id: 'proteinas', icon: '🍗', title: 'Proteínas', items: ['Jamón','Pollo','Pescado','Atún','Carne soya','Huevos'] },
+  { id: 'granos', icon: '🌾', title: 'Granos, pastas y cereales', items: ['Arroz','Pasta','Avena','Cuscús','Sopas','Garbanzos caja','Lentejas caja','Pan molde'] },
+  { id: 'snacks', icon: '🍪', title: 'Snacks y panadería', items: ['Galletas'] },
+  { id: 'verduras', icon: '🥕', title: 'Verduras y frutas', items: ['Choclo','Arvejas','Papas','Plátanos','Ajo'] },
+  { id: 'condimentos', icon: '🧂', title: 'Condimentos y especias', items: ['Azúcar','Sal','Salsa soya','Orégano','Pimienta','Comino','Sésamo','Sucedáneo limón','Ketchup','Mayonesa','Mostaza','Salsa tomate','Miel'] },
+  { id: 'aceites', icon: '🫒', title: 'Aceites', items: ['Aceite','Aceite oliva'] },
+  { id: 'bebidas', icon: '☕', title: 'Bebidas', items: ['Café','Jugo en polvo'] },
+  { id: 'conservas', icon: '🥫', title: 'Conservas y envasados', items: ['Mermeladas','Queso rayado'] },
+  { id: 'aseo', icon: '🧹', title: 'Aseo del hogar', items: ['Confort','Nova','Paños Montes','Jabón líquido'] }
+];
+
+let categories = [];
+let checked = {};
+let collapsed = {};
+let history = [];
+let currentFilter = 'all';
+let writing = false;
+
+const syncDot = document.getElementById('sync-dot');
+const syncLabel = document.getElementById('sync-label');
+
+function setSyncStatus(s) {
+  syncDot.className = 'sync-dot ' + s;
+  syncLabel.textContent = { ok: 'Sincronizado', err: 'Sin conexión', connecting: 'Conectando...' }[s] || '';
+}
+
+function save(path, value) {
+  setSyncStatus('connecting');
+  return set(ref(db, path), value)
+    .then(() => setSyncStatus('ok'))
+    .catch(e => { setSyncStatus('err'); console.error(e); });
+}
+
+function addHistoryEntry(type, msg) {
+  const now = new Date();
+  const time = now.toLocaleString('es-CL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+  const entry = { type, msg, time };
+  history.unshift(entry);
+  if (history.length > 80) history = history.slice(0, 80);
+  save('lista/history', history);
+}
+
+async function initData() {
+  const snap = await get(ref(db, 'lista'));
+  if (!snap.exists()) {
+    await save('lista', { categories: DEFAULT_CATEGORIES, checked: {}, collapsed: {}, history: [] });
+  }
+  document.getElementById('loading-screen').style.display = 'none';
+}
+
+onValue(ref(db, 'lista/categories'), snap => {
+  categories = snap.exists() ? (snap.val() || []) : [];
+  render();
+});
+
+onValue(ref(db, 'lista/checked'), snap => {
+  checked = snap.exists() ? (snap.val() || {}) : {};
+  render();
+});
+
+onValue(ref(db, 'lista/collapsed'), snap => {
+  collapsed = snap.exists() ? (snap.val() || {}) : {};
+  render();
+});
+
+onValue(ref(db, 'lista/history'), snap => {
+  history = snap.exists() ? (snap.val() || []) : [];
+  renderHistory();
+  setSyncStatus('ok');
+});
+
+function render() {
+  const query = (document.getElementById('search').value || '').toLowerCase().trim();
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  let anyVisible = false;
+
+  categories.forEach((cat, catIdx) => {
+    let visible = cat.items.map((item, i) => ({ item, i, key: catIdx+'__'+i }));
+    if (query) visible = visible.filter(r => r.item.toLowerCase().includes(query));
+    if (currentFilter === 'missing') visible = visible.filter(r => !checked[r.key]);
+    if (currentFilter === 'checked') visible = visible.filter(r => !!checked[r.key]);
+    if (visible.length === 0) return;
+    anyVisible = true;
+
+    const catDone = cat.items.length > 0 && cat.items.every((_,i) => checked[catIdx+'__'+i]);
+    const catChecked = cat.items.filter((_,i) => checked[catIdx+'__'+i]).length;
+    const isCollapsed = collapsed[cat.id] && !query;
+
+    const card = document.createElement('div');
+    card.className = 'cat-card' + (catDone ? ' all-done' : '') + (isCollapsed ? ' collapsed' : '');
+    card.innerHTML = `
+      <div class="cat-header" onclick="window._toggleCollapse('${cat.id}')">
+        <div class="cat-icon-wrap">${cat.icon}</div>
+        <div class="cat-title-group">
+          <div class="cat-title">${cat.title}</div>
+          <div class="cat-progress">${visible.length} producto${visible.length!==1?'s':''}</div>
+        </div>
+        <span class="cat-badge${catDone?' done':''}">${catDone?'Listo':catChecked+'/'+cat.items.length}</span>
+        <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6l4 4 4-4"/></svg>
+      </div>
+      <div class="cat-body"></div>
+    `;
+
+    const body = card.querySelector('.cat-body');
+    visible.forEach(({ item, i, key }) => {
+      const isChecked = !!checked[key];
+      const row = document.createElement('div');
+      row.className = 'item-row' + (isChecked ? ' done' : '');
+      row.innerHTML = `
+        <div class="check-box ${isChecked?'checked':''}" onclick="window._toggleCheck(${catIdx},${i},'${esc(item)}','${esc(cat.title)}')">
+          <svg class="check-svg" width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="item-name">${item}</span>
+        <button class="item-delete" onclick="window._deleteItem(${catIdx},${i},'${esc(item)}','${esc(cat.title)}')" title="Eliminar">✕</button>
+      `;
+      body.appendChild(row);
+    });
+
+    const addRow = document.createElement('div');
+    addRow.className = 'add-item-row';
+    addRow.innerHTML = `
+      <input class="add-item-input" type="text" placeholder="Agregar producto..."
+        onkeydown="if(event.key==='Enter') window._addItem(${catIdx},'${esc(cat.title)}',this)">
+      <button class="add-item-btn" onclick="window._addItem(${catIdx},'${esc(cat.title)}',this.previousElementSibling)">+</button>
+    `;
+    body.appendChild(addRow);
+    grid.appendChild(card);
+  });
+
+  if (!anyVisible) grid.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-tertiary);font-size:14px;grid-column:1/-1">No hay productos que coincidan.</div>';
+  updateStats();
+}
+
+function renderHistory() {
+  const el = document.getElementById('history-list');
+  if (!history.length) { el.innerHTML = '<div class="history-empty">Aún no hay cambios.</div>'; return; }
+  el.innerHTML = history.map(h => `
+    <div class="history-item">
+      <div class="history-dot dot-${h.type}"></div>
+      <div class="history-content">
+        <div class="history-msg">${h.msg}</div>
+        <div class="history-time">${h.time}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateStats() {
+  const total = categories.reduce((s,c) => s + c.items.length, 0);
+  const done = Object.values(checked).filter(Boolean).length;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-checked').textContent = done;
+  document.getElementById('stat-missing').textContent = total - done;
+  const pct = total > 0 ? Math.round(done/total*100) : 0;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-text').textContent = done+'/'+total;
+}
+
+function esc(s) { return String(s).replace(/'/g,"&#39;").replace(/"/g,"&quot;"); }
+
+window._toggleCheck = (catIdx, itemIdx, itemName, catTitle) => {
+  const key = catIdx+'__'+itemIdx;
+  const on = !checked[key];
+  checked[key] = on;
+  save('lista/checked', checked);
+  addHistoryEntry(on ? 'check' : 'uncheck',
+    on ? `<strong>${itemName}</strong> marcado en stock <span style="color:var(--text-tertiary)">(${catTitle})</span>`
+       : `<strong>${itemName}</strong> desmarcado <span style="color:var(--text-tertiary)">(${catTitle})</span>`
+  );
+};
+
+window._toggleCollapse = (catId) => {
+  collapsed[catId] = !collapsed[catId];
+  save('lista/collapsed', collapsed);
+};
+
+window._deleteItem = (catIdx, itemIdx, itemName, catTitle) => {
+  showConfirm(`Eliminar "${itemName}"`, `¿Estás seguro que quieres eliminar este producto de ${catTitle}?`, () => {
+    const newCats = JSON.parse(JSON.stringify(categories));
+    newCats[catIdx].items.splice(itemIdx, 1);
+    const newChecked = {};
+    Object.keys(checked).forEach(k => {
+      const [ci, ii] = k.split('__').map(Number);
+      if (ci !== catIdx) { newChecked[k] = checked[k]; return; }
+      if (ii < itemIdx) newChecked[k] = checked[k];
+      else if (ii > itemIdx) newChecked[catIdx+'__'+(ii-1)] = checked[k];
+    });
+    save('lista/categories', newCats);
+    save('lista/checked', newChecked);
+    addHistoryEntry('del_item', `Producto <strong>${itemName}</strong> eliminado de <span style="color:var(--text-tertiary)">${catTitle}</span>`);
+    showToast('Producto eliminado');
+  });
+};
+
+window._addItem = (catIdx, catTitle, input) => {
+  const name = input.value.trim();
+  if (!name) return;
+  const newCats = JSON.parse(JSON.stringify(categories));
+  newCats[catIdx].items.push(name);
+  input.value = '';
+  save('lista/categories', newCats);
+  addHistoryEntry('add_item', `Producto <strong>${name}</strong> agregado a <span style="color:var(--text-tertiary)">${catTitle}</span>`);
+  showToast('Producto agregado');
+};
+
+window.addCategory = () => {
+  const icon = document.getElementById('new-cat-icon').value;
+  const name = document.getElementById('new-cat-name').value.trim();
+  if (!name) { showToast('Escribe un nombre'); return; }
+  const id = 'cat_' + Date.now();
+  const newCats = JSON.parse(JSON.stringify(categories));
+  newCats.push({ id, icon, title: name, items: [] });
+  document.getElementById('new-cat-name').value = '';
+  save('lista/categories', newCats);
+  addHistoryEntry('add_cat', `Nueva categoría <strong>${icon} ${name}</strong> creada`);
+  showToast('Categoría creada');
+};
+
+window.clearHistory = () => {
+  showConfirm('Limpiar historial', '¿Borrar todos los registros?', () => {
+    save('lista/history', []);
+  });
+};
+
+window.confirmReset = () => {
+  const count = Object.values(checked).filter(Boolean).length;
+  showConfirm('Limpiar todos los checks', `Se desmarcarán ${count} producto${count!==1?'s':''}. Los productos y categorías se mantienen.`, () => {
+    save('lista/checked', {});
+    addHistoryEntry('uncheck', `Se limpiaron <strong>${count} checks</strong>`);
+    showToast('Lista limpiada');
+  });
+};
+
+window.setFilter = (filter, btn) => {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+};
+
+function showConfirm(title, msg, onOk) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-ok').onclick = () => { closeConfirm(); onOk(); };
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+
+window.closeConfirm = () => document.getElementById('confirm-overlay').classList.remove('show');
+
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+initData();
+</script>
+</body>
+</html>
